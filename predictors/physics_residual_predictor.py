@@ -33,6 +33,29 @@ def _build_torch_mlp(nn_module, input_dim: int, hidden_dims: list[int]):
     return nn_module.Sequential(*layers)
 
 
+def _torch_load_compat(torch_module, path: Path):
+    # PyTorch 2.6 defaulted to weights_only=True in torch.load.
+    # Predictor checkpoints include metadata arrays, so require full load.
+    try:
+        return torch_module.load(path, map_location="cpu", weights_only=False)
+    except TypeError:
+        # Older torch versions do not support the weights_only argument.
+        return torch_module.load(path, map_location="cpu")
+
+
+def _choose_torch_device(torch_module, device_flag: str):
+    flag = str(device_flag).strip().lower()
+    if flag == "cpu":
+        return torch_module.device("cpu")
+    if flag == "cuda":
+        if torch_module.cuda.is_available():
+            return torch_module.device("cuda")
+        return torch_module.device("cpu")
+    if torch_module.cuda.is_available():
+        return torch_module.device("cuda")
+    return torch_module.device("cpu")
+
+
 class PhysicsResidualPredictor(BasePredictor):
     """Physics-informed residual predictor with pluggable backends.
 
@@ -50,6 +73,7 @@ class PhysicsResidualPredictor(BasePredictor):
         residual_scale: float = 0.35,
         occupancy_patch_radius: int = 4,
         hidden_dims: tuple[int, ...] = (128, 128),
+        device: str = "auto",
         enable_uncertainty: bool = True,
         uncertainty_ensemble_samples: int = 5,
         uncertainty_feature_noise_std: float = 0.03,
@@ -62,6 +86,7 @@ class PhysicsResidualPredictor(BasePredictor):
         self.residual_scale = float(residual_scale)
         self.patch_radius = int(occupancy_patch_radius)
         self.hidden_dims = tuple(int(h) for h in hidden_dims)
+        self.device_flag = str(device)
         self.enable_uncertainty = bool(enable_uncertainty)
         self.uncertainty_ensemble_samples = max(1, int(uncertainty_ensemble_samples))
         self.uncertainty_feature_noise_std = float(uncertainty_feature_noise_std)
@@ -80,6 +105,7 @@ class PhysicsResidualPredictor(BasePredictor):
 
         self._torch = None
         self._nn = None
+        self.torch_device = None
         self.torch_model = None
         self.torch_feature_mean: np.ndarray | None = None
         self.torch_feature_std: np.ndarray | None = None
@@ -124,7 +150,7 @@ class PhysicsResidualPredictor(BasePredictor):
             self.loaded = False
             return
         try:
-            ckpt = torch.load(path, map_location="cpu")
+            ckpt = _torch_load_compat(torch, path)
             if not isinstance(ckpt, dict) or "model_state" not in ckpt:
                 return
 
@@ -132,6 +158,8 @@ class PhysicsResidualPredictor(BasePredictor):
             hidden_dims = [int(v) for v in ckpt.get("hidden_dims", list(self.hidden_dims))]
             model = _build_torch_mlp(nn, input_dim=input_dim, hidden_dims=hidden_dims)
             model.load_state_dict(ckpt["model_state"])
+            self.torch_device = _choose_torch_device(torch, self.device_flag)
+            model = model.to(self.torch_device)
             model.eval()
 
             self._torch = torch
@@ -219,6 +247,8 @@ class PhysicsResidualPredictor(BasePredictor):
                 ):
                     x_np = (x_np - self.torch_feature_mean) / np.maximum(self.torch_feature_std, 1e-6)
                 x = self._torch.from_numpy(x_np).unsqueeze(0)
+                if self.torch_device is not None:
+                    x = x.to(self.torch_device)
                 out = self.torch_model(x).squeeze(0).cpu().numpy().astype(np.float32)
             return np.tanh(out)
 
@@ -310,6 +340,7 @@ class PhysicsResidualPredictor(BasePredictor):
                 "loaded": self.loaded,
                 "weight_file": self.weight_file,
                 "feature_dim": self.expected_input_dim,
+                "device": str(self.torch_device) if self.torch_device is not None else "cpu",
                 "uncertainty_enabled": self.enable_uncertainty,
                 "uncertainty_samples": self.uncertainty_ensemble_samples,
                 "uncertainty_mean": unc_mean,

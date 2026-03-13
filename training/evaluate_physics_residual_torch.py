@@ -61,6 +61,17 @@ def _read_manifest(path: str, max_shards: int | None = None) -> list[str]:
     return out
 
 
+def _load_checkpoint(path: str):
+    # PyTorch 2.6 changed torch.load default to weights_only=True.
+    # Our checkpoint stores metadata arrays in addition to model_state, so
+    # this loader must explicitly disable weights_only when available.
+    try:
+        return torch.load(path, map_location="cpu", weights_only=False)
+    except TypeError:
+        # Older torch versions do not support the weights_only arg.
+        return torch.load(path, map_location="cpu")
+
+
 def main() -> None:
     args = parse_args()
 
@@ -69,7 +80,7 @@ def main() -> None:
         raise RuntimeError("No shards available for evaluation")
 
     device = _choose_device(args.device)
-    ckpt = torch.load(args.checkpoint, map_location="cpu")
+    ckpt = _load_checkpoint(args.checkpoint)
 
     input_dim = int(ckpt["input_dim"])
     hidden_dims = [int(v) for v in ckpt["hidden_dims"]]

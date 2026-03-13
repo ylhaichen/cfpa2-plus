@@ -259,6 +259,50 @@ MPLCONFIGDIR=/tmp/matplotlib PYTHONPATH=. python experiments/compare_predictors.
   --run-id cloud_predictor_sensitivity
 ```
 
+### Myriad One-Command Submission
+
+You can submit the full Myriad pipeline (collect array -> merge -> train+eval) with:
+
+```bash
+bash jobs/myriad_submit_full_pipeline.sh
+```
+
+Useful overrides:
+
+```bash
+NUM_TASKS=96 \
+NUM_SEEDS=6000 \
+RUN_TAG=myriad_big_run \
+GPU_ALLOW_TAG=L \
+bash jobs/myriad_submit_full_pipeline.sh
+```
+
+Notes:
+- `GPU_ALLOW_TAG=L` targets A100-40G nodes; omit it to allow any GPU type.
+- `VENV_PATH` defaults to `${REPO_DIR}/.venv`; override if your env lives elsewhere.
+
+### Myriad Parallel Benchmark Submission
+
+The benchmark workload is episode-parallel, so the recommended Myriad mode is a CPU array job rather than one long single-core job. The default submission script uses `36` array tasks and runs CPU-only unless you explicitly re-enable GPU requests:
+
+```bash
+NUM_TASKS=36 \
+BENCHMARK_TAG=bench36_cpu \
+PHYSICS_WEIGHT_FILE=/home/zcably0/physics_runs/full_20260312_172122/models/physics_residual_mlp.pt \
+bash jobs/myriad_submit_parallel_benchmark.sh
+```
+
+This launches:
+- planner comparison shards via `experiments/parallel_compare_planners_shard.py`
+- predictor-sensitivity shards via `experiments/parallel_compare_predictors_shard.py`
+- one merge job that builds final CSV summaries and plots
+
+To run only the planner comparison stage:
+
+```bash
+RUN_COMPARE=1 RUN_PREDICTORS=0 bash jobs/myriad_submit_parallel_benchmark.sh
+```
+
 Key planning-sensitivity outputs:
 - `decision_divergence_rate`
 - `chosen_frontier_difference_mean`

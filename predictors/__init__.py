@@ -24,6 +24,7 @@ def build_predictor(cfg: dict) -> BasePredictor:
             residual_scale=float(phy_cfg.get("residual_scale", 0.35)),
             occupancy_patch_radius=int(phy_cfg.get("occupancy_patch_radius", 4)),
             hidden_dims=hidden_dims,
+            device=str(phy_cfg.get("device", "auto")),
             enable_uncertainty=bool(phy_cfg.get("enable_uncertainty", True)),
             uncertainty_ensemble_samples=int(phy_cfg.get("uncertainty_ensemble_samples", 5)),
             uncertainty_feature_noise_std=float(phy_cfg.get("uncertainty_feature_noise_std", 0.03)),

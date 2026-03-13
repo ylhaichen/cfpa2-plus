@@ -113,6 +113,7 @@ predictor:
     residual_scale: 0.35
     occupancy_patch_radius: 4
     hidden_dims: [128, 128]
+    device: auto
     enable_uncertainty: true
     uncertainty_ensemble_samples: 5
     uncertainty_feature_noise_std: 0.03
