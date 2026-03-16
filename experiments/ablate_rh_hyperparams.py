@@ -50,6 +50,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", type=str, default="outputs")
     parser.add_argument("--disable-animation", action="store_true")
     parser.add_argument("--physics-weight-file", type=str, default=None)
+    parser.add_argument("--task-index", type=int, default=0)
+    parser.add_argument("--num-tasks", type=int, default=1)
 
     parser.add_argument("--score-modes", nargs="+", default=["hybrid", "immediate_only"], choices=["hybrid", "immediate_only", "future_only"])
     parser.add_argument("--horizons", nargs="+", type=int, default=[3, 4, 5])
@@ -189,12 +191,17 @@ def main() -> None:
             "num_seeds": args.num_seeds,
             "max_steps": args.max_steps,
             "num_combos": len(combos),
+            "task_index": int(args.task_index),
+            "num_tasks": int(args.num_tasks),
             "git_commit": git_commit_hash(),
         },
     )
 
     sim = GridSimulation()
     rows: list[dict] = []
+    task_index = max(0, int(args.task_index))
+    num_tasks = max(1, int(args.num_tasks))
+    combo_items = [(idx, combo) for idx, combo in enumerate(combos) if idx % num_tasks == task_index]
 
     for planner_name in args.planners:
         planner_cfg = PLANNER_CFG[planner_name]
@@ -209,7 +216,7 @@ def main() -> None:
                 base_cfg["predictor"]["physics_residual"]["enabled"] = True
                 base_cfg["predictor"]["physics_residual"]["weight_file"] = args.physics_weight_file
 
-            for combo_idx, combo in enumerate(combos):
+            for combo_idx, combo in combo_items:
                 cfg = _apply_combo(base_cfg, combo)
                 if args.disable_animation:
                     cfg["experiment"]["save_animation"] = False
@@ -255,8 +262,19 @@ def main() -> None:
                     )
 
     raw_df = pd.DataFrame(rows)
-    raw_csv = dirs["results_csv"] / "ablate_rh_results.csv"
+    shard_mode = num_tasks > 1
+    shard_dir = dirs["results_csv"] / "shards"
+    if shard_mode:
+        shard_dir.mkdir(parents=True, exist_ok=True)
+        raw_csv = shard_dir / f"ablate_rh_results_shard_{task_index:03d}.csv"
+    else:
+        raw_csv = dirs["results_csv"] / "ablate_rh_results.csv"
     raw_df.to_csv(raw_csv, index=False)
+
+    if raw_df.empty:
+        print(f"No ablation rows generated for task_index={task_index} num_tasks={num_tasks}")
+        print(f"raw_csv: {raw_csv}")
+        return
 
     summary_df = (
         raw_df.groupby(
@@ -287,8 +305,17 @@ def main() -> None:
         )
     )
     summary_df["objective_score"] = _objective_score(summary_df)
-    summary_csv = dirs["results_csv"] / "ablate_rh_summary.csv"
+    if shard_mode:
+        summary_csv = shard_dir / f"ablate_rh_summary_shard_{task_index:03d}.csv"
+    else:
+        summary_csv = dirs["results_csv"] / "ablate_rh_summary.csv"
     summary_df.to_csv(summary_csv, index=False)
+
+    if shard_mode:
+        print(f"task_index={task_index} num_tasks={num_tasks} combos={len(combo_items)}")
+        print(f"raw_csv: {raw_csv}")
+        print(f"summary_csv: {summary_csv}")
+        return
 
     overall_df = (
         summary_df.groupby(
