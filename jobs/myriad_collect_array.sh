@@ -12,11 +12,11 @@ PREDICTOR_TYPE="${PREDICTOR_TYPE:-path_follow}"
 SEED_START="${SEED_START:-0}"
 NUM_SEEDS="${NUM_SEEDS:-4000}"
 EPISODES_PER_SEED="${EPISODES_PER_SEED:-1}"
-MAX_STEPS="${MAX_STEPS:-400}"
+MAX_STEPS="${MAX_STEPS:-450}"
 SHARD_SIZE="${SHARD_SIZE:-200000}"
 HARD_OVERSAMPLE="${HARD_OVERSAMPLE:-0.70}"
 HARD_MAP_TYPES_CSV="${HARD_MAP_TYPES_CSV:-sharp_turn_corridor,narrow_t_branches,bottleneck_rooms,interaction_cross,branching_deadend}"
-ENV_CFGS_CSV="${ENV_CFGS_CSV:-configs/env_maze.yaml,configs/env_go2w_like.yaml,configs/env_narrow_t_branches.yaml}"
+ENV_CFGS_CSV="${ENV_CFGS_CSV:-configs/env_narrow_t_branches.yaml,configs/env_narrow_t_dense_branches.yaml,configs/env_narrow_t_asymmetric_branches.yaml,configs/env_narrow_t_loop_branches.yaml}"
 VENV_PATH="${VENV_PATH:-}"
 
 if [[ -n "${VENV_PATH}" && -f "${VENV_PATH}/bin/activate" ]]; then

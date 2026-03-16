@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from core.config import load_experiment_config, write_config_snapshot
-from experiments.common import git_commit_hash, make_run_id, prepare_output_dirs, save_run_metadata
+from experiments.common import enforce_mp4_only, git_commit_hash, make_run_id, prepare_output_dirs, save_run_metadata
 from simulators.grid_sim import GridSimulation
 
 
@@ -38,6 +43,7 @@ def main() -> None:
 
     planner_cfg = args.planner_config or default_planner_cfg(args.planner)
     cfg = load_experiment_config(args.base_config, planner_cfg_path=planner_cfg, env_cfg_path=args.env_config)
+    cfg = enforce_mp4_only(cfg)
     cfg["planning"]["planner_name"] = args.planner
     if args.planner == "physics_rh_cfpa2" and args.physics_weight_file is not None:
         cfg["predictor"]["type"] = "physics_residual"

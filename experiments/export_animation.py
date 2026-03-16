@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from core.config import load_experiment_config
-from experiments.common import make_run_id, prepare_output_dirs
+from experiments.common import enforce_mp4_only, make_run_id, prepare_output_dirs
 from simulators.grid_sim import GridSimulation
 
 PLANNER_CFG = {
@@ -32,6 +37,7 @@ def main() -> None:
     planner_cfg = PLANNER_CFG[args.planner]
 
     cfg = load_experiment_config(args.base_config, planner_cfg_path=planner_cfg, env_cfg_path=args.env_config)
+    cfg = enforce_mp4_only(cfg)
     cfg["planning"]["planner_name"] = args.planner
     if args.planner == "physics_rh_cfpa2" and args.physics_weight_file is not None:
         cfg["predictor"]["type"] = "physics_residual"
@@ -39,6 +45,7 @@ def main() -> None:
         cfg["predictor"]["physics_residual"]["weight_file"] = args.physics_weight_file
     cfg["termination"]["max_steps"] = int(args.max_steps)
     cfg["experiment"]["save_animation"] = True
+    cfg["animation"]["save_gif"] = False
     cfg["animation"]["save_mp4"] = True
 
     run_id = args.run_id or make_run_id("anim")

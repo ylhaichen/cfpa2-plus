@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from core.config import load_experiment_config, write_config_snapshot
-from experiments.common import git_commit_hash, prepare_output_dirs, save_run_metadata
+from experiments.common import enforce_mp4_only, git_commit_hash, prepare_output_dirs, save_run_metadata
 from simulators.grid_sim import GridSimulation
 
 PLANNER_CFG = {
@@ -20,7 +25,16 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run one shard of planner comparison cases")
     parser.add_argument("--base-config", type=str, default="configs/base.yaml")
     parser.add_argument("--planners", nargs="+", default=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"], choices=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"])
-    parser.add_argument("--env-configs", nargs="+", default=["configs/env_maze.yaml", "configs/env_go2w_like.yaml"])
+    parser.add_argument(
+        "--env-configs",
+        nargs="+",
+        default=[
+            "configs/env_maze.yaml",
+            "configs/env_narrow_t_branches.yaml",
+            "configs/env_narrow_t_asymmetric_branches.yaml",
+            "configs/env_narrow_t_loop_branches.yaml",
+        ],
+    )
     parser.add_argument("--seed-start", type=int, default=0)
     parser.add_argument("--num-seeds", type=int, default=2)
     parser.add_argument("--max-steps", type=int, default=None)
@@ -80,6 +94,7 @@ def main() -> None:
         env_label = Path(env_cfg_path).stem
         planner_cfg_path = PLANNER_CFG[planner_name]
         cfg = load_experiment_config(args.base_config, planner_cfg_path=planner_cfg_path, env_cfg_path=env_cfg_path)
+        cfg = enforce_mp4_only(cfg)
         cfg["planning"]["planner_name"] = planner_name
         if planner_name == "physics_rh_cfpa2" and args.physics_weight_file is not None:
             cfg["predictor"]["type"] = "physics_residual"

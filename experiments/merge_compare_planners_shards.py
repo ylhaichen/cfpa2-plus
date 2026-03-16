@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from experiments.common import prepare_output_dirs
 from experiments.compare_planners_across_maps import _plot_metrics_tables, _plot_summary

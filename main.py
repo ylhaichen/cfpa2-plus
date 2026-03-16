@@ -5,7 +5,7 @@ import argparse
 import pandas as pd
 
 from core.config import load_experiment_config, write_config_snapshot
-from experiments.common import git_commit_hash, make_run_id, prepare_output_dirs, save_run_metadata
+from experiments.common import enforce_mp4_only, git_commit_hash, make_run_id, prepare_output_dirs, save_run_metadata
 from simulators.grid_sim import GridSimulation
 
 PLANNER_CFG = {
@@ -16,8 +16,10 @@ PLANNER_CFG = {
 
 ENV_CFG = {
     "maze": "configs/env_maze.yaml",
-    "go2w_like": "configs/env_go2w_like.yaml",
     "narrow_t_branches": "configs/env_narrow_t_branches.yaml",
+    "narrow_t_dense_branches": "configs/env_narrow_t_dense_branches.yaml",
+    "narrow_t_asymmetric_branches": "configs/env_narrow_t_asymmetric_branches.yaml",
+    "narrow_t_loop_branches": "configs/env_narrow_t_loop_branches.yaml",
 }
 
 
@@ -30,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         "--env",
         type=str,
         default="narrow_t_branches",
-        choices=["maze", "go2w_like", "narrow_t_branches"],
+        choices=["maze", "narrow_t_branches", "narrow_t_dense_branches", "narrow_t_asymmetric_branches", "narrow_t_loop_branches"],
         help="Named environment preset; ignored when --env-config is provided.",
     )
     parser.add_argument("--env-config", type=str, default=None, help="Direct environment config path override")
@@ -50,6 +52,7 @@ def main() -> None:
     env_cfg = args.env_config or ENV_CFG[args.env]
 
     cfg = load_experiment_config(args.base_config, planner_cfg_path=planner_cfg, env_cfg_path=env_cfg)
+    cfg = enforce_mp4_only(cfg)
     cfg["planning"]["planner_name"] = args.planner
 
     if args.planner == "physics_rh_cfpa2" and args.physics_weight_file is not None:

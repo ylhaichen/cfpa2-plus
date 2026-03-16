@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from experiments.compare_planners_across_maps import main as compare_planners_main
 
 ENV_CFG = {
     "maze": "configs/env_maze.yaml",
-    "go2w_like": "configs/env_go2w_like.yaml",
     "narrow_t_branches": "configs/env_narrow_t_branches.yaml",
+    "narrow_t_dense_branches": "configs/env_narrow_t_dense_branches.yaml",
+    "narrow_t_asymmetric_branches": "configs/env_narrow_t_asymmetric_branches.yaml",
+    "narrow_t_loop_branches": "configs/env_narrow_t_loop_branches.yaml",
 }
 
 
@@ -24,8 +31,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--envs",
         nargs="+",
-        default=["maze", "go2w_like", "narrow_t_branches"],
-        choices=["maze", "go2w_like", "narrow_t_branches"],
+        default=["maze", "narrow_t_branches", "narrow_t_asymmetric_branches", "narrow_t_loop_branches"],
+        choices=["maze", "narrow_t_branches", "narrow_t_dense_branches", "narrow_t_asymmetric_branches", "narrow_t_loop_branches"],
         help="Named env presets; ignored when --env-configs is provided.",
     )
     parser.add_argument("--env-configs", nargs="+", default=None, help="Direct env config paths")

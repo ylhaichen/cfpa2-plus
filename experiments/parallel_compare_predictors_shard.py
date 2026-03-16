@@ -1,11 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import sys
 
 import pandas as pd
 
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from core.config import load_experiment_config, write_config_snapshot
-from experiments.common import git_commit_hash, prepare_output_dirs, save_run_metadata
+from experiments.common import enforce_mp4_only, git_commit_hash, prepare_output_dirs, save_run_metadata
 from simulators.grid_sim import GridSimulation
 
 PLANNER_CFG = {
@@ -90,6 +97,7 @@ def main() -> None:
         planner_cfg = PLANNER_CFG[planner_name]
         if planner_name not in base_cfg_cache:
             base_cfg = load_experiment_config(args.base_config, planner_cfg_path=planner_cfg, env_cfg_path=args.env_config)
+            base_cfg = enforce_mp4_only(base_cfg)
             base_cfg["planning"]["planner_name"] = planner_name
             if args.max_steps is not None:
                 base_cfg["termination"]["max_steps"] = int(args.max_steps)

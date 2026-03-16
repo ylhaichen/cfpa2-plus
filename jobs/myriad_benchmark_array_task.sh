@@ -25,7 +25,7 @@ if [[ -n "${SGE_TASK_ID:-}" ]]; then
   TASK_INDEX=$((SGE_TASK_ID - 1))
 fi
 
-IFS=';' read -r -a COMPARE_ENV_CONFIGS <<< "${COMPARE_ENV_CONFIGS_CSV:-configs/env_narrow_t_branches.yaml;configs/env_maze.yaml;configs/env_go2w_like.yaml}"
+IFS=';' read -r -a COMPARE_ENV_CONFIGS <<< "${COMPARE_ENV_CONFIGS_CSV:-configs/env_narrow_t_branches.yaml;configs/env_narrow_t_dense_branches.yaml;configs/env_narrow_t_asymmetric_branches.yaml;configs/env_narrow_t_loop_branches.yaml}"
 IFS=';' read -r -a PREDICTOR_PLANNERS <<< "${PREDICTOR_PLANNERS_CSV:-rh_cfpa2;physics_rh_cfpa2}"
 IFS=';' read -r -a PREDICTOR_TYPES <<< "${PREDICTOR_TYPES_CSV:-path_follow;physics_residual}"
 IFS=';' read -r -a ROLLOUT_HORIZONS <<< "${ROLLOUT_HORIZONS_CSV:-3;5;7}"
@@ -37,7 +37,7 @@ if [[ "${RUN_COMPARE:-1}" == "1" ]]; then
     --env-configs "${COMPARE_ENV_CONFIGS[@]}" \
     --seed-start "${SEED_START:-0}" \
     --num-seeds "${NUM_SEEDS:-10}" \
-    --max-steps "${MAX_STEPS:-2500}" \
+    --max-steps "${MAX_STEPS:-5000}" \
     --run-id "${COMPARE_RUN_ID}" \
     --output-root "${OUTPUT_ROOT}" \
     --disable-animation \
@@ -55,7 +55,7 @@ if [[ "${RUN_PREDICTORS:-1}" == "1" ]]; then
     --rollout-horizons "${ROLLOUT_HORIZONS[@]}" \
     --seed-start "${SEED_START:-0}" \
     --num-seeds "${NUM_SEEDS:-10}" \
-    --max-steps "${MAX_STEPS:-2500}" \
+    --max-steps "${MAX_STEPS:-5000}" \
     --run-id "${PREDICTOR_RUN_ID}" \
     --output-root "${OUTPUT_ROOT}" \
     --disable-animation \

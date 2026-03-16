@@ -1,15 +1,15 @@
 environment:
-  map_name: narrow_t_branches
-  map_type: narrow_t_branches
-  map_width: 96
-  map_height: 72
+  map_name: narrow_t_asymmetric_branches
+  map_type: narrow_t_asymmetric_branches
+  map_width: 104
+  map_height: 76
   random_seed: 42
   obstacle_density: 0.02
 
 robots:
   start_positions:
-    - [47, 64]
-    - [49, 64]
+    - [51, 68]
+    - [53, 68]
   sensor_fov_deg: 300.0
   observation_miss_prob: 0.0
 

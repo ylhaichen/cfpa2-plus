@@ -254,6 +254,168 @@ def generate_narrow_t_branches(width: int, height: int, obstacle_density: float,
     return grid
 
 
+def generate_narrow_t_dense_branches(width: int, height: int, obstacle_density: float, seed: int) -> np.ndarray:
+    """Generate a denser T-corridor maze with frequent short branches and dead-ends."""
+    rng = _rng(seed)
+    grid = generate_narrow_t_branches(width, height, obstacle_density=0.0, seed=seed)
+
+    cx = width // 2
+    y_bottom = height - 6
+    y_t = max(12, height // 3)
+    branch_rows = list(range(y_t + 4, y_bottom - 4, 4))
+
+    for by in branch_rows:
+        left_len = int(rng.integers(8, max(10, width // 4)))
+        right_len = int(rng.integers(8, max(10, width // 4)))
+        _carve_corridor(grid, (cx, by), (max(2, cx - left_len), by), width=0)
+        _carve_corridor(grid, (cx, by), (min(width - 3, cx + right_len), by), width=0)
+
+        if rng.random() < 0.8:
+            x_left = max(2, cx - left_len)
+            twig = int(rng.integers(3, 7))
+            _carve_corridor(grid, (x_left, by), (x_left, max(2, by - twig)), width=0)
+        if rng.random() < 0.8:
+            x_right = min(width - 3, cx + right_len)
+            twig = int(rng.integers(3, 7))
+            _carve_corridor(grid, (x_right, by), (x_right, min(height - 3, by + twig)), width=0)
+
+    cap_rows = [y_t + 6, y_t + 12]
+    for idx, y_loop in enumerate(cap_rows):
+        if y_loop >= height - 6:
+            continue
+        left_x = max(4, width // 7)
+        right_x = min(width - 5, width - width // 7)
+        _carve_corridor(grid, (left_x, y_loop), (right_x, y_loop), width=0)
+        if idx == 0:
+            _carve_corridor(grid, (left_x, y_t), (left_x, y_loop), width=0)
+            _carve_corridor(grid, (right_x, y_t), (right_x, y_loop), width=0)
+
+    free_cells = np.argwhere(grid == FREE)
+    n_blockers = int(obstacle_density * 0.03 * len(free_cells))
+    if n_blockers > 0:
+        picks = free_cells[rng.choice(len(free_cells), size=n_blockers, replace=False)]
+        for y, x in picks:
+            if x == cx or y in (y_t, y_t + 6, y_t + 12):
+                continue
+            if rng.random() < 0.25:
+                grid[y, x] = OCCUPIED
+
+    _add_boundaries(grid)
+    return grid
+
+
+def generate_narrow_t_asymmetric_branches(width: int, height: int, obstacle_density: float, seed: int) -> np.ndarray:
+    """Generate an asymmetric T-corridor map with uneven side-branch density."""
+    rng = _rng(seed)
+    grid = np.full((height, width), OCCUPIED, dtype=np.int8)
+    _add_boundaries(grid)
+
+    cx = width // 2
+    y_bottom = height - 6
+    y_t = max(13, height // 3)
+
+    _carve_corridor(grid, (cx, y_bottom), (cx, y_t), width=0)
+
+    x_left = max(4, width // 6)
+    x_right = min(width - 5, width - width // 10)
+    _carve_corridor(grid, (x_left, y_t), (x_right, y_t), width=0)
+
+    bay_y0 = max(2, y_bottom - 3)
+    bay_y1 = min(height - 3, y_bottom + 1)
+    grid[bay_y0 : bay_y1 + 1, cx - 3 : cx + 4] = FREE
+
+    left_rows = list(range(y_t + 4, y_bottom - 4, 5))
+    right_rows = list(range(y_t + 6, y_bottom - 4, 8))
+
+    for by in left_rows:
+        left_len = int(rng.integers(max(10, width // 7), max(14, width // 3)))
+        end_x = max(2, cx - left_len)
+        _carve_corridor(grid, (cx, by), (end_x, by), width=0)
+        if rng.random() < 0.85:
+            twig = int(rng.integers(3, 8))
+            _carve_corridor(grid, (end_x, by), (end_x, max(2, by - twig)), width=0)
+
+    for by in right_rows:
+        right_len = int(rng.integers(6, max(8, width // 5)))
+        end_x = min(width - 3, cx + right_len)
+        _carve_corridor(grid, (cx, by), (end_x, by), width=0)
+        if rng.random() < 0.55:
+            twig = int(rng.integers(3, 7))
+            _carve_corridor(grid, (end_x, by), (end_x, min(height - 3, by + twig)), width=0)
+
+    top_branch_x = list(range(x_left + 5, x_right - 4, max(8, width // 12)))
+    for i, bx in enumerate(top_branch_x):
+        drop = int(rng.integers(5, max(7, height // 4)))
+        end_y = min(height - 4, y_t + drop)
+        _carve_corridor(grid, (bx, y_t), (bx, end_y), width=0)
+        fork = int(rng.integers(3, 7))
+        if i % 2 == 0:
+            _carve_corridor(grid, (bx, end_y), (max(2, bx - fork), end_y), width=0)
+        else:
+            _carve_corridor(grid, (bx, end_y), (min(width - 3, bx + fork), end_y), width=0)
+
+    free_cells = np.argwhere(grid == FREE)
+    n_blockers = int(obstacle_density * 0.04 * len(free_cells))
+    if n_blockers > 0:
+        picks = free_cells[rng.choice(len(free_cells), size=n_blockers, replace=False)]
+        for y, x in picks:
+            if x == cx or y == y_t:
+                continue
+            if rng.random() < 0.25:
+                grid[y, x] = OCCUPIED
+
+    _add_boundaries(grid)
+    return grid
+
+
+def generate_narrow_t_loop_branches(width: int, height: int, obstacle_density: float, seed: int) -> np.ndarray:
+    """Generate a T-corridor map with a narrow upper loop and branch pockets."""
+    rng = _rng(seed)
+    grid = generate_narrow_t_branches(width, height, obstacle_density=0.0, seed=seed)
+
+    cx = width // 2
+    y_t = max(12, height // 3)
+    loop_y = min(height - 8, y_t + max(8, height // 7))
+    left_x = max(4, width // 7)
+    right_x = min(width - 5, width - width // 7)
+
+    _carve_corridor(grid, (left_x, loop_y), (right_x, loop_y), width=0)
+    _carve_corridor(grid, (left_x, y_t), (left_x, loop_y), width=0)
+    _carve_corridor(grid, (right_x, y_t), (right_x, loop_y), width=0)
+
+    connector_xs = [max(6, cx - width // 8), min(width - 7, cx + width // 8)]
+    for bx in connector_xs:
+        drop = int(rng.integers(5, max(7, height // 5)))
+        end_y = min(height - 4, loop_y + drop)
+        _carve_corridor(grid, (bx, loop_y), (bx, end_y), width=0)
+        branch = int(rng.integers(4, 8))
+        if bx < cx:
+            _carve_corridor(grid, (bx, end_y), (max(2, bx - branch), end_y), width=0)
+        else:
+            _carve_corridor(grid, (bx, end_y), (min(width - 3, bx + branch), end_y), width=0)
+
+    lower_rows = list(range(loop_y + 5, height - 10, 6))
+    for i, by in enumerate(lower_rows):
+        span = int(rng.integers(7, max(8, width // 5)))
+        if i % 2 == 0:
+            _carve_corridor(grid, (cx, by), (max(2, cx - span), by), width=0)
+        else:
+            _carve_corridor(grid, (cx, by), (min(width - 3, cx + span), by), width=0)
+
+    free_cells = np.argwhere(grid == FREE)
+    n_blockers = int(obstacle_density * 0.03 * len(free_cells))
+    if n_blockers > 0:
+        picks = free_cells[rng.choice(len(free_cells), size=n_blockers, replace=False)]
+        for y, x in picks:
+            if x in (cx, left_x, right_x) or y in (y_t, loop_y):
+                continue
+            if rng.random() < 0.22:
+                grid[y, x] = OCCUPIED
+
+    _add_boundaries(grid)
+    return grid
+
+
 def generate_sharp_turn_corridor(width: int, height: int, obstacle_density: float, seed: int) -> np.ndarray:
     """Generate zig-zag narrow corridors with repeated sharp turns."""
     rng = _rng(seed)
@@ -357,6 +519,12 @@ def generate_map(map_type: str, width: int, height: int, obstacle_density: float
         return generate_branching_deadend(width, height, obstacle_density, seed)
     if map_type == "narrow_t_branches":
         return generate_narrow_t_branches(width, height, obstacle_density, seed)
+    if map_type == "narrow_t_dense_branches":
+        return generate_narrow_t_dense_branches(width, height, obstacle_density, seed)
+    if map_type == "narrow_t_asymmetric_branches":
+        return generate_narrow_t_asymmetric_branches(width, height, obstacle_density, seed)
+    if map_type == "narrow_t_loop_branches":
+        return generate_narrow_t_loop_branches(width, height, obstacle_density, seed)
     if map_type == "sharp_turn_corridor":
         return generate_sharp_turn_corridor(width, height, obstacle_density, seed)
     if map_type == "interaction_cross":

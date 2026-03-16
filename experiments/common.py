@@ -40,5 +40,16 @@ def prepare_output_dirs(output_root: str | Path, run_id: str) -> dict[str, Path]
     return dirs
 
 
+def enforce_mp4_only(cfg: dict[str, Any]) -> dict[str, Any]:
+    experiment_cfg = dict(cfg.get("experiment", {}))
+    animation_cfg = dict(cfg.get("animation", {}))
+    experiment_cfg["animation_format"] = "mp4"
+    animation_cfg["save_gif"] = False
+    animation_cfg["save_mp4"] = True
+    cfg["experiment"] = experiment_cfg
+    cfg["animation"] = animation_cfg
+    return cfg
+
+
 def save_run_metadata(path: str | Path, payload: dict[str, Any]) -> None:
     write_json(path, payload)

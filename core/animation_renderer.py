@@ -202,9 +202,7 @@ class AnimationRenderer:
                         w.append_data(frame)
                 mp4_path = str(mp4)
             except Exception:
-                fallback = output_stem.with_suffix(".gif")
-                imageio.mimsave(fallback, self.frames, fps=self.fps)
-                gif_path = str(fallback)
+                mp4_path = None
 
         if self.enable_live:
             plt.ioff()
