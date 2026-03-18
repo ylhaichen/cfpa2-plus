@@ -5,6 +5,7 @@ This repository is the **upgraded framework version** of:
 
 It keeps CFPA2 baseline behavior, and extends the codebase into a unified planner framework supporting:
 - `cfpa2` (centralized myopic joint frontier assignment baseline)
+- `cfpa2_plus` / `cfpa2_plus_phase1` (execution-aware CFPA2 with calibration pipeline)
 - `rh_cfpa2` (receding-horizon rollout CFPA2)
 - `physics_rh_cfpa2` (RH-CFPA2 + pluggable physics residual trajectory predictor)
 
@@ -108,6 +109,18 @@ MPLCONFIGDIR=/tmp/matplotlib PYTHONPATH=. python experiments/run_compare.py \
   --envs maze go2w_like narrow_t_branches \
   --seed-start 0 --num-seeds 3 --animate-first-seed-only
 ```
+
+## Phase 1.5 Calibration
+
+Phase 1.5 keeps the planner family fixed and only calibrates execution-aware score terms for `cfpa2_plus_phase1`.
+
+Local + Myriad workflow:
+- manifest generation: `experiments/generate_phase15_manifest.py`
+- one-row runner: `experiments/run_manifest_row.py`
+- summary: `experiments/summarize_phase15.py`
+- plotting: `experiments/plot_metrics.py`
+- Myriad handoff docs: `jobs/myriad/README.md`
+- local handoff guide: `README_phase15.md`
 
 Run predictor + rollout ablation:
 

@@ -51,7 +51,20 @@ class EpisodeMetrics:
     chosen_frontier_difference_count: int = 0
     predictor_rollout_score_variances: list[float] = field(default_factory=list)
 
+    execution_penalties: list[float] = field(default_factory=list)
+    execution_penalty_records: list[dict[str, Any]] = field(default_factory=list)
+    clearance_penalties: list[float] = field(default_factory=list)
+    density_penalties: list[float] = field(default_factory=list)
+    turn_complexity_penalties: list[float] = field(default_factory=list)
+    narrowness_penalties: list[float] = field(default_factory=list)
+    teammate_proximity_penalties: list[float] = field(default_factory=list)
+    slowdown_exposure_penalties: list[float] = field(default_factory=list)
+
+    low_progress_steps: int = 0
+    blocked_or_slow_steps_proxy: int = 0
+
     _last_targets: dict[int, tuple[int, int] | None] = field(default_factory=dict)
+    _summary_cache: dict[str, Any] = field(default_factory=dict)
 
     def log_step(
         self,
@@ -135,6 +148,38 @@ class EpisodeMetrics:
             if diff > 0:
                 self.decision_divergence_count += 1
             self.chosen_frontier_difference_count += int(diff)
+
+    def log_execution_penalties(
+        self,
+        step_idx: int,
+        penalties_by_robot: dict[int, float],
+        feature_breakdown_by_robot: dict[int, dict[str, float]] | None = None,
+    ) -> None:
+        feature_breakdown_by_robot = feature_breakdown_by_robot or {}
+        for rid, penalty in penalties_by_robot.items():
+            penalty_f = float(penalty)
+            self.execution_penalties.append(penalty_f)
+            record = {
+                "step": int(step_idx),
+                "robot_id": int(rid),
+                "execution_penalty": penalty_f,
+            }
+
+            features = dict(feature_breakdown_by_robot.get(rid, {}))
+            if features:
+                record.update({k: float(v) for k, v in features.items()})
+                self.clearance_penalties.append(float(features.get("clearance_penalty", 0.0)))
+                self.density_penalties.append(float(features.get("obstacle_density_penalty", 0.0)))
+                self.turn_complexity_penalties.append(float(features.get("turn_complexity_penalty", 0.0)))
+                self.narrowness_penalties.append(float(features.get("corridor_narrowness_penalty", 0.0)))
+                self.teammate_proximity_penalties.append(float(features.get("teammate_proximity_penalty", 0.0)))
+                self.slowdown_exposure_penalties.append(float(features.get("slowdown_exposure_penalty", 0.0)))
+
+            self.execution_penalty_records.append(record)
+
+    def log_execution_step(self, low_progress: bool, blocked_or_slow: bool) -> None:
+        self.low_progress_steps += int(bool(low_progress))
+        self.blocked_or_slow_steps_proxy += int(bool(blocked_or_slow))
 
     def register_predictions(self, step_idx: int, predicted_paths: dict[int, list[tuple[int, int]]]) -> None:
         for rid, path in predicted_paths.items():
@@ -242,6 +287,41 @@ class EpisodeMetrics:
             if self.decision_probe_pair_count > 0
             else 0.0
         )
+        execution_penalty_mean = (
+            float(sum(self.execution_penalties) / len(self.execution_penalties))
+            if self.execution_penalties
+            else 0.0
+        )
+        clearance_penalty_mean = (
+            float(sum(self.clearance_penalties) / len(self.clearance_penalties))
+            if self.clearance_penalties
+            else 0.0
+        )
+        density_penalty_mean = (
+            float(sum(self.density_penalties) / len(self.density_penalties))
+            if self.density_penalties
+            else 0.0
+        )
+        turn_penalty_mean = (
+            float(sum(self.turn_complexity_penalties) / len(self.turn_complexity_penalties))
+            if self.turn_complexity_penalties
+            else 0.0
+        )
+        narrowness_penalty_mean = (
+            float(sum(self.narrowness_penalties) / len(self.narrowness_penalties))
+            if self.narrowness_penalties
+            else 0.0
+        )
+        teammate_penalty_mean = (
+            float(sum(self.teammate_proximity_penalties) / len(self.teammate_proximity_penalties))
+            if self.teammate_proximity_penalties
+            else 0.0
+        )
+        slowdown_penalty_mean = (
+            float(sum(self.slowdown_exposure_penalties) / len(self.slowdown_exposure_penalties))
+            if self.slowdown_exposure_penalties
+            else 0.0
+        )
 
         base = {
             "planner_name": self.planner_name,
@@ -275,6 +355,17 @@ class EpisodeMetrics:
             "chosen_frontier_difference_mean": frontier_diff_mean,
             "predictor_rollout_score_variance_mean": score_var_mean,
             "predictor_rollout_score_variance_p95": score_var_p95,
+            "execution_penalty_mean": execution_penalty_mean,
+            "execution_penalty_per_assignment": json.dumps(self.execution_penalty_records, sort_keys=True),
+            "avg_assigned_frontier_execution_penalty": execution_penalty_mean,
+            "clearance_penalty_mean": clearance_penalty_mean,
+            "density_penalty_mean": density_penalty_mean,
+            "turn_penalty_mean": turn_penalty_mean,
+            "narrowness_penalty_mean": narrowness_penalty_mean,
+            "teammate_proximity_penalty_mean": teammate_penalty_mean,
+            "slowdown_exposure_penalty_mean": slowdown_penalty_mean,
+            "low_progress_steps": int(self.low_progress_steps),
+            "blocked_or_slow_steps_proxy": int(self.blocked_or_slow_steps_proxy),
             "replan_reasons": json.dumps(self.replan_reasons, sort_keys=True),
         }
         base.update(self._summary_cache)

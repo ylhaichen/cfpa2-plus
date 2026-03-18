@@ -279,9 +279,10 @@ class GridSimulation(BaseSimulator):
         for r in robots:
             map_mgr.observe_from(r.pose, r.heading_deg, sensor_range, sensor_fov, use_los, miss_prob, rng)
 
+        planner_label = str(cfg["planning"].get("planner_label", planner_name))
         planner = build_planner(cfg)
         metrics = EpisodeMetrics(
-            planner_name=planner_name,
+            planner_name=planner_label,
             map_name=str(env_cfg.get("map_name", env_cfg["map_type"])),
             seed=int(seed),
             rollout_horizon=int(cfg["planning"]["rollout"].get("horizon", 1)),
@@ -299,6 +300,8 @@ class GridSimulation(BaseSimulator):
         last_replan_reason = "init"
         last_planner_ms = 0.0
         last_predictor_ms = 0.0
+        last_planner_debug: dict = {}
+        last_execution_penalty_mean = 0.0
         decision_probe_calls = 0
 
         max_steps = int(cfg["termination"].get("max_steps", 1000))
@@ -334,6 +337,7 @@ class GridSimulation(BaseSimulator):
                         "last_replan_reason": last_replan_reason,
                         "last_planner_compute_time_ms": float(last_planner_ms),
                         "last_predictor_inference_time_ms": float(last_predictor_ms),
+                        "last_execution_penalty_mean": float(last_execution_penalty_mean),
                         "robot_poses": str({r.robot_id: r.pose for r in robots}),
                         "robot_headings_deg": str({r.robot_id: round(r.heading_deg, 2) for r in robots}),
                         "robot_velocities": str({r.robot_id: (round(r.velocity[0], 4), round(r.velocity[1], 4)) for r in robots}),
@@ -446,6 +450,22 @@ class GridSimulation(BaseSimulator):
                 metrics.log_replan(replan_reason, planner_compute_time=plan_dt)
                 metrics.log_assignments(assignments)
                 metrics.register_predictions(step_idx, planner_output.predicted_paths)
+                last_planner_debug = dict(planner_output.debug)
+                last_execution_penalty_mean = float(last_planner_debug.get("selected_execution_penalty_mean", 0.0))
+                execution_penalties = last_planner_debug.get("selected_execution_penalty_by_robot")
+                feature_breakdowns = last_planner_debug.get("selected_execution_feature_breakdown_by_robot")
+                if isinstance(execution_penalties, dict):
+                    normalized_penalties = {int(k): float(v) for k, v in execution_penalties.items()}
+                    normalized_features: dict[int, dict[str, float]] = {}
+                    if isinstance(feature_breakdowns, dict):
+                        for rid, values in feature_breakdowns.items():
+                            if isinstance(values, dict):
+                                normalized_features[int(rid)] = {str(k): float(v) for k, v in values.items()}
+                    metrics.log_execution_penalties(
+                        step_idx=step_idx,
+                        penalties_by_robot=normalized_penalties,
+                        feature_breakdown_by_robot=normalized_features,
+                    )
                 predictor_times = planner_output.debug.get("predictor_inference_times")
                 if isinstance(predictor_times, dict):
                     metrics.log_predictor_times(predictor_times)
@@ -487,8 +507,10 @@ class GridSimulation(BaseSimulator):
                     metrics.log_congestion()
 
             occupied_next: set[tuple[int, int]] = set()
+            moved_count = 0
+            had_blocked_or_slow = False
             for r in robots:
-                _moved, conflict, congested = _execute_robot_step(
+                moved, conflict, congested = _execute_robot_step(
                     robot=r,
                     map_mgr=map_mgr,
                     cfg=cfg,
@@ -496,10 +518,16 @@ class GridSimulation(BaseSimulator):
                     occupied_next=occupied_next,
                     step_dt=step_dt,
                 )
+                moved_count += int(bool(moved))
                 if conflict:
                     metrics.log_conflict()
                 if congested:
                     metrics.log_congestion()
+                had_blocked_or_slow = had_blocked_or_slow or bool(conflict) or bool(congested) or (not moved and bool(r.current_target))
+
+            moved_ratio = float(moved_count) / float(max(1, len(robots)))
+            low_progress = moved_ratio <= 0.5
+            metrics.log_execution_step(low_progress=low_progress, blocked_or_slow=had_blocked_or_slow or low_progress)
 
             for r in robots:
                 map_mgr.observe_from(r.pose, r.heading_deg, sensor_range, sensor_fov, use_los, miss_prob, rng)
@@ -529,7 +557,7 @@ class GridSimulation(BaseSimulator):
                 frontier_candidates=frontier_candidates,
                 assignments=assignments,
                 coverage=coverage,
-                planner_name=planner_name,
+                planner_name=planner_label,
                 seed=seed,
                 sim_time=sim_time,
                 replan_count=metrics.replan_count,
@@ -537,6 +565,7 @@ class GridSimulation(BaseSimulator):
                 last_replan_reason=last_replan_reason,
                 sensor_range=sensor_range,
                 sensor_fov_deg=sensor_fov,
+                planner_debug=last_planner_debug,
             )
 
             prev_frontier_count = len(frontier_candidates)

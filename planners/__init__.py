@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .base_planner import BasePlanner
 from .cfpa2_planner import CFPA2Planner
+from .cfpa2_plus_planner import CFPA2PlusPlanner
 from .physics_rh_cfpa2_planner import PhysicsRHCFPA2Planner
 from .rh_cfpa2_planner import RHCFPA2Planner
 
@@ -10,6 +11,8 @@ def build_planner(cfg: dict) -> BasePlanner:
     planner_name = str(cfg.get("planning", {}).get("planner_name", "cfpa2"))
     if planner_name == "cfpa2":
         return CFPA2Planner()
+    if planner_name == "cfpa2_plus":
+        return CFPA2PlusPlanner()
     if planner_name == "rh_cfpa2":
         return RHCFPA2Planner(cfg)
     if planner_name == "physics_rh_cfpa2":
@@ -20,6 +23,7 @@ def build_planner(cfg: dict) -> BasePlanner:
 __all__ = [
     "BasePlanner",
     "CFPA2Planner",
+    "CFPA2PlusPlanner",
     "RHCFPA2Planner",
     "PhysicsRHCFPA2Planner",
     "build_planner",

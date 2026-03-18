@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from core.preset_registry import planner_compare_choices
 from experiments.compare_planners_across_maps import main as compare_planners_main
 
 ENV_CFG = {
@@ -26,7 +27,7 @@ def parse_args() -> argparse.Namespace:
         "--planners",
         nargs="+",
         default=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"],
-        choices=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"],
+        choices=planner_compare_choices(),
     )
     parser.add_argument(
         "--envs",

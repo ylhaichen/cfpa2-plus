@@ -11,20 +11,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from core.config import load_experiment_config, write_config_snapshot
+from core.preset_registry import get_planner_preset, planner_compare_choices
 from experiments.common import enforce_mp4_only, git_commit_hash, prepare_output_dirs, save_run_metadata
 from simulators.grid_sim import GridSimulation
-
-PLANNER_CFG = {
-    "cfpa2": "configs/planner_cfpa2.yaml",
-    "rh_cfpa2": "configs/planner_rh_cfpa2.yaml",
-    "physics_rh_cfpa2": "configs/planner_physics_rh_cfpa2.yaml",
-}
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run one shard of planner comparison cases")
     parser.add_argument("--base-config", type=str, default="configs/base.yaml")
-    parser.add_argument("--planners", nargs="+", default=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"], choices=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"])
+    parser.add_argument("--planners", nargs="+", default=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"], choices=planner_compare_choices())
     parser.add_argument(
         "--env-configs",
         nargs="+",
@@ -90,13 +85,15 @@ def main() -> None:
 
     print(f"[compare_planners_shard] task={args.task_index}/{args.num_tasks} selected_cases={len(selected)}", flush=True)
 
-    for combo_idx, env_cfg_path, planner_name, seed in selected:
+    for combo_idx, env_cfg_path, planner_choice, seed in selected:
         env_label = Path(env_cfg_path).stem
-        planner_cfg_path = PLANNER_CFG[planner_name]
+        planner_preset = get_planner_preset(planner_choice)
+        planner_cfg_path = planner_preset.config_path
         cfg = load_experiment_config(args.base_config, planner_cfg_path=planner_cfg_path, env_cfg_path=env_cfg_path)
         cfg = enforce_mp4_only(cfg)
-        cfg["planning"]["planner_name"] = planner_name
-        if planner_name == "physics_rh_cfpa2" and args.physics_weight_file is not None:
+        cfg["planning"]["planner_name"] = planner_preset.planner_name
+        cfg["planning"]["planner_label"] = planner_preset.planner_label
+        if planner_preset.planner_name == "physics_rh_cfpa2" and args.physics_weight_file is not None:
             cfg["predictor"]["type"] = "physics_residual"
             cfg["predictor"]["physics_residual"]["enabled"] = True
             cfg["predictor"]["physics_residual"]["weight_file"] = args.physics_weight_file
@@ -104,7 +101,7 @@ def main() -> None:
             cfg["termination"]["max_steps"] = int(args.max_steps)
 
         if args.task_index == 0:
-            snapshot_path = dirs["configs"] / f"resolved_{env_label}_{planner_name}.yaml"
+            snapshot_path = dirs["configs"] / f"resolved_{env_label}_{planner_preset.planner_label}.yaml"
             if not snapshot_path.exists():
                 write_config_snapshot(snapshot_path, cfg)
 
@@ -116,12 +113,13 @@ def main() -> None:
             cfg_local["experiment"]["save_animation"] = bool(combo_idx == 0)
 
         map_name = cfg_local["environment"].get("map_name", cfg_local["environment"].get("map_type", env_label))
-        stem = f"{planner_name}_{map_name}_seed{seed}"
-        episode_dir = dirs["episode"] / map_name / planner_name / f"seed_{seed}"
+        map_family = cfg_local["environment"].get("map_family", map_name)
+        stem = f"{planner_preset.planner_label}_{map_name}_seed{seed}"
+        episode_dir = dirs["episode"] / map_name / planner_preset.planner_label / f"seed_{seed}"
 
         result = sim.run_episode(
             cfg=cfg_local,
-            planner_name=planner_name,
+            planner_name=planner_preset.planner_name,
             seed=seed,
             output_dir=episode_dir,
             animation_stem=stem,
@@ -131,8 +129,12 @@ def main() -> None:
         row.update(
             {
                 "run_id": args.run_id,
+                "planner_choice": planner_choice,
+                "planner_label": planner_preset.planner_label,
+                "planner_base_name": planner_preset.planner_name,
                 "env_config": env_cfg_path,
                 "planner_config": planner_cfg_path,
+                "map_family": map_family,
                 "coverage_csv": result.coverage_csv_path,
                 "step_log_csv": result.step_log_csv_path,
                 "animation_gif": result.animation_gif_path,
@@ -142,7 +144,7 @@ def main() -> None:
         rows.append(row)
 
         print(
-            f"task={args.task_index} planner={planner_name} map={map_name} seed={seed} "
+            f"task={args.task_index} planner={planner_preset.planner_label} map={map_name} seed={seed} "
             f"success={row['success']} steps={row['completion_steps']} "
             f"coverage={row['final_coverage']:.3f}",
             flush=True,

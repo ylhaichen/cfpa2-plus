@@ -1,0 +1,32 @@
+planning:
+  planner_name: cfpa2_plus
+  planner_label: cfpa2_plus_phase1_no_narrowness
+  cfpa2_plus:
+    enabled_components:
+      execution_aware: true
+    score_mode:
+      baseline_weight: 1.0
+      execution_weight: 1.0
+      lambda_exec: 6.0
+    execution:
+      enabled: true
+      clearance_ref: 4.0
+      density_radius: 3
+      narrow_clearance_threshold: 2.5
+      teammate_distance_threshold: 6.0
+      path_sample_stride: 2
+      path_prefix_steps: null
+      use_path_prefix_only: false
+      normalize_features: true
+      debug_record_feature_breakdown: true
+      max_clearance_scan_radius: 6
+      slowdown_density_threshold: 0.20
+      w_clearance: 1.0
+      w_density: 0.7
+      w_turn: 0.5
+      w_narrow: 0.0
+      w_team: 0.8
+      w_slowdown: 0.8
+predictor:
+  type: path_follow
+

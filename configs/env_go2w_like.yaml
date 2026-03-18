@@ -1,5 +1,6 @@
 environment:
   map_name: go2w_like_indoor
+  map_family: bottleneck_heavy
   map_type: bottleneck_rooms
   map_width: 100
   map_height: 76

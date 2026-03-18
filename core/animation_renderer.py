@@ -84,6 +84,7 @@ class AnimationRenderer:
         last_replan_reason: str,
         sensor_range: int,
         sensor_fov_deg: float,
+        planner_debug: dict | None = None,
     ) -> None:
         if not self.should_draw(step_idx):
             return
@@ -156,6 +157,33 @@ class AnimationRenderer:
             f"joint_score={score_txt}\n"
             f"last_replan={last_replan_reason}"
         )
+        if planner_debug:
+            exec_penalty = planner_debug.get("selected_execution_penalty_mean")
+            if exec_penalty is not None:
+                info += f"\nexec_penalty={float(exec_penalty):.3f}"
+            feature_means = planner_debug.get("selected_execution_feature_means")
+            if isinstance(feature_means, dict) and feature_means:
+                short = {
+                    "clearance_penalty": "clr",
+                    "obstacle_density_penalty": "den",
+                    "turn_complexity_penalty": "turn",
+                    "corridor_narrowness_penalty": "nar",
+                    "teammate_proximity_penalty": "team",
+                    "slowdown_exposure_penalty": "slow",
+                }
+                parts = []
+                for key in [
+                    "clearance_penalty",
+                    "obstacle_density_penalty",
+                    "turn_complexity_penalty",
+                    "corridor_narrowness_penalty",
+                    "teammate_proximity_penalty",
+                    "slowdown_exposure_penalty",
+                ]:
+                    if key in feature_means:
+                        parts.append(f"{short[key]}:{float(feature_means[key]):.2f}")
+                if parts:
+                    info += "\nexec=[" + " ".join(parts) + "]"
         self.ax.text(
             1.01,
             0.99,
