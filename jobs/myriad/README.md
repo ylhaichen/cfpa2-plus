@@ -2,46 +2,63 @@
 
 This folder contains **UCL Myriad / SGE** scripts for Phase 1.5 calibration of `cfpa2_plus_phase1`.
 
+These scripts follow the same stable pattern as the existing working Myriad jobs in this repo:
+- pass `REPO_DIR` explicitly
+- pass `OUTPUT_ROOT` explicitly
+- pass log paths with `qsub -o/-e`
+- optionally pass `CONDA_SH` and `CONDA_ENV`
+- or reuse an existing venv via `VENV_PATH`
+
 ## 1. Clone And Prepare
 
 ```bash
 git clone <your-repo-url>
-cd cfpa2-rh-physics-exploration
-mkdir -p outputs/myriad_logs
+cd cfpa2-plus
+export REPO_DIR="$PWD"
+export OUTPUT_ROOT="$REPO_DIR/outputs"
+mkdir -p "$OUTPUT_ROOT/myriad_logs"
 ```
 
 ## 2. Python Environment
 
-Each script has two editable sections near the top:
+Choose one:
+- pass `CONDA_SH` and `CONDA_ENV`
+- pass `VENV_PATH`
+- or submit from an already activated environment and omit both
 
-- Option A: module-based Python
-- Option B: user-managed conda or venv
+Conda example:
 
-You must edit one of these strategies before large runs.
+```bash
+export CONDA_SH="$HOME/miniconda3/etc/profile.d/conda.sh"
+export CONDA_ENV="cfpa2rh"
+```
 
-Typical module-based path:
-- keep `module purge`
-- keep `module load python/...`
-- leave `PHASE15_USE_MODULE_PYTHON=1`
+Venv example:
 
-Typical conda-based path:
-- set `PHASE15_USE_MODULE_PYTHON=0`
-- set `PHASE15_USE_CUSTOM_PYTHON=1`
-- uncomment `source ~/miniconda3/etc/profile.d/conda.sh`
-- set the correct env name
+```bash
+export VENV_PATH="$HOME/venvs/cfpa2rh"
+```
 
 ## 3. Generate A Manifest
 
 Small sanity:
 
 ```bash
-qsub jobs/myriad/job_phase15_small_sanity.sh
+qsub \
+  -o "$OUTPUT_ROOT/myriad_logs" \
+  -e "$OUTPUT_ROOT/myriad_logs" \
+  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}" \
+  jobs/myriad/job_phase15_small_sanity.sh
 ```
 
 Full manifest generation:
 
 ```bash
-qsub -v MANIFEST_PROFILE=full,MANIFEST_TAG=phase15_calib_a jobs/myriad/job_phase15_generate_manifest.sh
+qsub \
+  -o "$OUTPUT_ROOT/myriad_logs" \
+  -e "$OUTPUT_ROOT/myriad_logs" \
+  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}",MANIFEST_PROFILE=full,MANIFEST_TAG=phase15_calib_a \
+  jobs/myriad/job_phase15_generate_manifest.sh
 ```
 
 The job prints:
@@ -56,7 +73,12 @@ After manifest generation, inspect the row count and submit an array job.
 Example:
 
 ```bash
-qsub -t 1-1053 -v MANIFEST_PATH=outputs/manifests/phase15_full_<tag>.csv jobs/myriad/job_phase15_manifest_array.sh
+qsub \
+  -o "$OUTPUT_ROOT/myriad_logs" \
+  -e "$OUTPUT_ROOT/myriad_logs" \
+  -t 1-1053 \
+  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}",MANIFEST_PATH="$OUTPUT_ROOT/manifests/phase15_full_<tag>.csv" \
+  jobs/myriad/job_phase15_manifest_array.sh
 ```
 
 The script maps:
@@ -68,7 +90,12 @@ The script maps:
 After the array job completes:
 
 ```bash
-qsub -hold_jid <array_job_id> -v MANIFEST_PATH=outputs/manifests/phase15_full_<tag>.csv jobs/myriad/job_phase15_summarize.sh
+qsub \
+  -o "$OUTPUT_ROOT/myriad_logs" \
+  -e "$OUTPUT_ROOT/myriad_logs" \
+  -hold_jid <array_job_id> \
+  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}",MANIFEST_PATH="$OUTPUT_ROOT/manifests/phase15_full_<tag>.csv" \
+  jobs/myriad/job_phase15_summarize.sh
 ```
 
 This writes:
@@ -76,25 +103,26 @@ This writes:
 - `phase15_grouped_summary.csv`
 - `phase15_best_configs.csv`
 - `phase15_feature_redundancy_summary.csv`
-- plots under `outputs/benchmarks/<phase15_subdir>/phase15_summary/plots/`
+- plots under `"$OUTPUT_ROOT/benchmarks/<phase15_subdir>/phase15_summary/plots/"`
 
 ## 6. Files Written By This Workflow
 
 Manifest:
-- `outputs/manifests/phase15_*.csv`
+- `"$OUTPUT_ROOT/manifests/phase15_*.csv"`
 
 Array stdout/stderr:
-- `outputs/myriad_logs/`
+- `"$OUTPUT_ROOT/myriad_logs/"`
 
 Benchmark outputs:
-- `outputs/benchmarks/phase15_*/`
+- `"$OUTPUT_ROOT/benchmarks/phase15_*/"`
 
 ## 7. Minimal Myriad Order
 
 1. clone or pull repo
-2. edit Python activation lines in the scripts
-3. `mkdir -p outputs/myriad_logs`
-4. `qsub jobs/myriad/job_phase15_generate_manifest.sh`
-5. submit `job_phase15_manifest_array.sh` with the correct `-t` range and `MANIFEST_PATH`
-6. submit `job_phase15_summarize.sh` with `-hold_jid`
-7. inspect grouped CSVs and plots
+2. set `REPO_DIR` and `OUTPUT_ROOT`
+3. optionally set `CONDA_SH/CONDA_ENV` or `VENV_PATH`
+4. `mkdir -p "$OUTPUT_ROOT/myriad_logs"`
+5. submit `job_phase15_generate_manifest.sh`
+6. submit `job_phase15_manifest_array.sh` with the correct `-t` range and `MANIFEST_PATH`
+7. submit `job_phase15_summarize.sh` with `-hold_jid`
+8. inspect grouped CSVs and plots under `"$OUTPUT_ROOT"`

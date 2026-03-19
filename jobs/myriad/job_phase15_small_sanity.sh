@@ -6,33 +6,29 @@
 #$ -l h_rt=01:30:00
 #$ -l mem=4G
 #$ -l tmpfs=4G
-#$ -o outputs/myriad_logs/
-#$ -e outputs/myriad_logs/
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_DIR="${REPO_DIR:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
-OUTPUT_ROOT="${OUTPUT_ROOT:-outputs}"
+: "${REPO_DIR:?REPO_DIR is required}"
+: "${OUTPUT_ROOT:?OUTPUT_ROOT is required}"
+
 SANITY_TAG="${SANITY_TAG:-phase15_sanity_${JOB_ID:-local}}"
 SANITY_ROWS="${SANITY_ROWS:-2}"
+CONDA_SH="${CONDA_SH:-}"
+CONDA_ENV="${CONDA_ENV:-}"
+VENV_PATH="${VENV_PATH:-}"
+
+if [[ -n "${CONDA_SH}" && -n "${CONDA_ENV}" ]]; then
+  # shellcheck disable=SC1090
+  source "${CONDA_SH}"
+  conda activate "${CONDA_ENV}"
+elif [[ -n "${VENV_PATH}" && -f "${VENV_PATH}/bin/activate" ]]; then
+  # shellcheck disable=SC1090
+  source "${VENV_PATH}/bin/activate"
+fi
 
 cd "${REPO_DIR}"
-
 mkdir -p "${OUTPUT_ROOT}/myriad_logs"
-
-# Option A: module-based Python on Myriad.
-if [[ "${PHASE15_USE_MODULE_PYTHON:-1}" == "1" ]]; then
-  module purge
-  module load python/3.11.3
-fi
-
-# Option B: user-managed conda or venv.
-# TODO: edit these lines if you prefer conda or a virtualenv.
-if [[ "${PHASE15_USE_CUSTOM_PYTHON:-0}" == "1" ]]; then
-  source "${PHASE15_CONDA_SH:-$HOME/miniconda3/etc/profile.d/conda.sh}"
-  conda activate "${PHASE15_CONDA_ENV:-cfpa2rh}"
-fi
 
 export PYTHONPATH="${REPO_DIR}"
 export OMP_NUM_THREADS=1
@@ -43,6 +39,8 @@ mkdir -p "${MPLCONFIGDIR}"
 echo "hostname=$(hostname)"
 echo "date=$(date)"
 echo "python=$(python --version 2>&1)"
+echo "repo_dir=${REPO_DIR}"
+echo "output_root=${OUTPUT_ROOT}"
 
 python experiments/generate_phase15_manifest.py \
   --output-root "${OUTPUT_ROOT}" \
