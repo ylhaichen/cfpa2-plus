@@ -2,12 +2,13 @@
 
 This folder contains **UCL Myriad / SGE** scripts for Phase 1.5 calibration of `cfpa2_plus_phase1`.
 
-These scripts follow the same stable pattern as the existing working Myriad jobs in this repo:
+These scripts now use the same stable **shard-style array pattern** as the existing working Myriad jobs in this repo:
 - pass `REPO_DIR` explicitly
 - pass `OUTPUT_ROOT` explicitly
 - pass log paths with `qsub -o/-e`
 - optionally pass `CONDA_SH` and `CONDA_ENV`
 - or reuse an existing venv via `VENV_PATH`
+- use `NUM_TASKS` shards rather than one SGE task per manifest row
 
 ## 1. Clone And Prepare
 
@@ -68,7 +69,12 @@ The job prints:
 
 ## 4. Submit The Array Job
 
-After manifest generation, inspect the row count and submit an array job.
+After manifest generation, inspect the real manifest filename and submit a **shard-style** array job.
+
+Recommended starting point:
+- `NUM_TASKS=36`
+- `-t 1-36`
+- `-tc 36`
 
 Example:
 
@@ -76,14 +82,30 @@ Example:
 qsub \
   -o "$OUTPUT_ROOT/myriad_logs" \
   -e "$OUTPUT_ROOT/myriad_logs" \
-  -t 1-1053 \
-  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}",MANIFEST_PATH="$OUTPUT_ROOT/manifests/phase15_full_<tag>.csv" \
+  -t 1-36 \
+  -tc 36 \
+  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",NUM_TASKS=36,CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}",MANIFEST_PATH="$OUTPUT_ROOT/manifests/phase15_full_<tag>.csv" \
   jobs/myriad/job_phase15_manifest_array.sh
 ```
 
-The script maps:
-- `SGE_TASK_ID=1` -> manifest row `0`
-- `SGE_TASK_ID=N` -> manifest row `N-1`
+More aggressive option:
+
+```bash
+qsub \
+  -o "$OUTPUT_ROOT/myriad_logs" \
+  -e "$OUTPUT_ROOT/myriad_logs" \
+  -t 1-72 \
+  -tc 72 \
+  -v REPO_DIR="$REPO_DIR",OUTPUT_ROOT="$OUTPUT_ROOT",NUM_TASKS=72,CONDA_SH="${CONDA_SH:-}",CONDA_ENV="${CONDA_ENV:-}",VENV_PATH="${VENV_PATH:-}",MANIFEST_PATH="$OUTPUT_ROOT/manifests/phase15_full_<tag>.csv" \
+  jobs/myriad/job_phase15_manifest_array.sh
+```
+
+The script maps work like this:
+- task `0` runs rows `0, NUM_TASKS, 2*NUM_TASKS, ...`
+- task `1` runs rows `1, NUM_TASKS+1, 2*NUM_TASKS+1, ...`
+- and so on
+
+This is usually much more scheduler-friendly on Myriad than submitting one array task per manifest row.
 
 ## 5. Summarize And Plot
 
@@ -123,6 +145,6 @@ Benchmark outputs:
 3. optionally set `CONDA_SH/CONDA_ENV` or `VENV_PATH`
 4. `mkdir -p "$OUTPUT_ROOT/myriad_logs"`
 5. submit `job_phase15_generate_manifest.sh`
-6. submit `job_phase15_manifest_array.sh` with the correct `-t` range and `MANIFEST_PATH`
+6. submit `job_phase15_manifest_array.sh` with the correct `MANIFEST_PATH`, `NUM_TASKS`, and matching `-t/-tc`
 7. submit `job_phase15_summarize.sh` with `-hold_jid`
 8. inspect grouped CSVs and plots under `"$OUTPUT_ROOT"`

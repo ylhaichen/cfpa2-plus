@@ -104,13 +104,13 @@ Plots:
 
 ## Myriad Workflow
 
-Use the Myriad-specific instructions in [jobs/myriad/README.md](/Users/yangliuhaichen/Desktop/cfpa2-rh-physics-exploration/jobs/myriad/README.md).
+Use the Myriad-specific instructions in `jobs/myriad/README.md`.
 
 The intended sequence is:
 1. clone or pull the repo on Myriad
 2. edit Python environment activation lines in `jobs/myriad/*.sh`
 3. submit `job_phase15_generate_manifest.sh`
-4. submit `job_phase15_manifest_array.sh`
+4. submit `job_phase15_manifest_array.sh` with shard-style `NUM_TASKS`
 5. submit `job_phase15_summarize.sh`
 
 ## GitHub Push Guidance

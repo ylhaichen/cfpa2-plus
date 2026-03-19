@@ -12,15 +12,17 @@
 
 1. A manifest exists under `outputs/manifests/phase15_*.csv`.
 2. The manifest has valid `planner_label`, `env_config`, `seed`, `run_id`, and `output_subdir`.
-3. The manifest row count matches the intended Myriad array size.
+3. The manifest row count is known before submission.
+4. The chosen shard count `NUM_TASKS` is recorded for the Myriad run.
 
 ## Myriad Job Readiness
 
 1. `jobs/myriad/job_phase15_generate_manifest.sh` is configured with the correct Python activation block.
-2. `jobs/myriad/job_phase15_manifest_array.sh` has the correct manifest path and array range.
-3. `jobs/myriad/job_phase15_summarize.sh` points to the same manifest.
-4. `jobs/myriad/job_phase15_small_sanity.sh` has been reviewed for quick preflight runs.
-5. `outputs/myriad_logs/` exists before `qsub`.
+2. `jobs/myriad/job_phase15_manifest_array.sh` has the correct manifest path.
+3. `NUM_TASKS` matches the `qsub -t 1-N -tc N` submission settings.
+4. `jobs/myriad/job_phase15_summarize.sh` points to the same manifest.
+5. `jobs/myriad/job_phase15_small_sanity.sh` has been reviewed for quick preflight runs.
+6. `outputs/myriad_logs/` exists before `qsub`.
 
 ## Push Guidance
 
@@ -47,9 +49,10 @@ Do not push:
 3. `mkdir -p outputs/myriad_logs`
 4. `qsub jobs/myriad/job_phase15_generate_manifest.sh`
 5. inspect printed manifest path and row count
-6. `qsub -t 1-N -v MANIFEST_PATH=<manifest_csv> jobs/myriad/job_phase15_manifest_array.sh`
-7. `qsub -hold_jid <array_job_id> -v MANIFEST_PATH=<manifest_csv> jobs/myriad/job_phase15_summarize.sh`
-8. inspect grouped CSVs and plots under `outputs/benchmarks/<phase15_subdir>/phase15_summary/`
+6. choose shard count, for example `NUM_TASKS=36`
+7. `qsub -t 1-N -tc N -v NUM_TASKS=N,MANIFEST_PATH=<manifest_csv> jobs/myriad/job_phase15_manifest_array.sh`
+8. `qsub -hold_jid <array_job_id> -v MANIFEST_PATH=<manifest_csv> jobs/myriad/job_phase15_summarize.sh`
+9. inspect grouped CSVs and plots under `outputs/benchmarks/<phase15_subdir>/phase15_summary/`
 
 ## Final Sanity Before Cloud
 
